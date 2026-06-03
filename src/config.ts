@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { loadInstanceIdentity, type InstanceIdentity } from './cluster/identity.js';
+import type { ProviderConfig } from './engines/providers.js';
 
 /** Agent engine backing a bot. */
 export type EngineName = 'claude' | 'kimi' | 'codex';
@@ -18,6 +19,14 @@ export interface BotConfigBase {
   ttsVoice?: string;
   /** Agent engine. Defaults to 'claude' for backward compatibility. */
   engine?: EngineName;
+  /**
+   * Optional LLM provider override (M3). Lets a bot point its underlying CLI
+   * (claude / codex / kimi) at a non-default backend — OpenAI, DeepSeek, Kimi,
+   * Qwen, Minimax, or a `custom` OpenAI-compatible endpoint. When absent,
+   * engines keep their current behavior (read auth from env / built-in CLI
+   * defaults). Resolution happens via `resolveProvider()` in `engines/providers.ts`.
+   */
+  provider?: ProviderConfig;
   claude: {
     defaultWorkingDirectory: string;
     maxTurns: number | undefined;
@@ -191,6 +200,8 @@ interface EngineJsonFields {
   engine?: EngineName;
   kimi?: KimiJsonConfig;
   codex?: CodexJsonConfig;
+  /** LLM provider override (M3). See `BotConfigBase.provider`. */
+  provider?: ProviderConfig;
 }
 
 export interface FeishuBotJsonEntry extends EngineJsonFields {
@@ -228,6 +239,7 @@ function feishuBotFromJson(entry: FeishuBotJsonEntry): BotConfig {
     ...(entry.engine ? { engine: entry.engine } : {}),
     ...(entry.kimi ? { kimi: entry.kimi } : {}),
     ...(codex ? { codex } : {}),
+    ...(entry.provider ? { provider: entry.provider } : {}),
     feishu: {
       appId: entry.feishuAppId,
       appSecret: entry.feishuAppSecret,
@@ -269,6 +281,7 @@ function telegramBotFromJson(entry: TelegramBotJsonEntry): TelegramBotConfig {
     ...(entry.engine ? { engine: entry.engine } : {}),
     ...(entry.kimi ? { kimi: entry.kimi } : {}),
     ...(codex ? { codex } : {}),
+    ...(entry.provider ? { provider: entry.provider } : {}),
     telegram: {
       botToken: entry.telegramBotToken,
     },
@@ -307,6 +320,7 @@ export function webBotFromJson(entry: WebBotJsonEntry): BotConfigBase {
     ...(entry.engine ? { engine: entry.engine } : {}),
     ...(entry.kimi ? { kimi: entry.kimi } : {}),
     ...(codex ? { codex } : {}),
+    ...(entry.provider ? { provider: entry.provider } : {}),
     claude: buildClaudeConfig(entry),
   };
 }
@@ -335,6 +349,7 @@ function wechatBotFromJson(entry: WechatBotJsonEntry): WechatBotConfig {
     ...(entry.engine ? { engine: entry.engine } : {}),
     ...(entry.kimi ? { kimi: entry.kimi } : {}),
     ...(codex ? { codex } : {}),
+    ...(entry.provider ? { provider: entry.provider } : {}),
     wechat: {
       ilinkBaseUrl: entry.ilinkBaseUrl,
       botToken: entry.wechatBotToken,
