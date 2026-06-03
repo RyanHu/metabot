@@ -7,6 +7,7 @@ import type { SDKUserMessage, SpawnOptions, SpawnedProcess } from '@anthropic-ai
 import type { BotConfigBase } from '../../config.js';
 import type { Logger } from '../../utils/logger.js';
 import { AsyncQueue } from '../../utils/async-queue.js';
+import { resolveProvider, type ResolvedProvider } from '../providers.js';
 
 const isWindows = process.platform === 'win32';
 
@@ -78,7 +79,7 @@ function hasCredentialsFile(): boolean {
  * - Merges process.env so child inherits system PATH, TEMP, etc.
  * - Optionally injects an explicit ANTHROPIC_API_KEY from bots.json config.
  */
-function createSpawnFn(explicitApiKey?: string): (options: SpawnOptions) => SpawnedProcess {
+function createSpawnFn(explicitApiKey?: string, provider?: ResolvedProvider): (options: SpawnOptions) => SpawnedProcess {
   // Force-use-env mode: pass ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY /
   // ANTHROPIC_BASE_URL through to the Claude Code subprocess instead of
   // filtering them out. Triggered by either:
@@ -123,6 +124,22 @@ function createSpawnFn(explicitApiKey?: string): (options: SpawnOptions) => Spaw
     // Inject explicit API key from bots.json (after filtering, so it takes effect)
     if (explicitApiKey) {
       env.ANTHROPIC_API_KEY = explicitApiKey;
+    }
+
+    // Provider override (M3): when a bot has a `provider` config, point Claude
+    // Code's Anthropic client at that backend. `provider.baseUrl` must speak
+    // the Anthropic Messages API — either natively (authStyle === 'anthropic')
+    // or via a translating proxy like LiteLLM (authStyle === 'openai-compatible').
+    // provider overrides explicitApiKey: provider config is more specific.
+    if (provider) {
+      env.ANTHROPIC_BASE_URL = provider.baseUrl;
+      if (provider.apiKey) {
+        env.ANTHROPIC_API_KEY = provider.apiKey;
+        env.ANTHROPIC_AUTH_TOKEN = provider.apiKey;
+      }
+      for (const [k, v] of Object.entries(provider.extraEnv)) {
+        env[k] = v;
+      }
     }
 
     // Default-enable Claude Code Agent Teams. Without a real terminal there's
@@ -313,7 +330,7 @@ export class ClaudeExecutor {
       // (>= 0.2.140) supplies the correct command in spawn options — for the
       // native Claude binary that's the binary itself; for legacy JS
       // entrypoints it's the Node executable.
-      spawnClaudeCodeProcess: createSpawnFn(this.config.claude.apiKey),
+      spawnClaudeCodeProcess: createSpawnFn(this.config.claude.apiKey, resolveProvider(this.config.provider)),
       pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE,
       // MetaBot has no terminal — split-pane (tmux/iTerm2) teammate display
       // doesn't apply. Force in-process so teammates run inside the same

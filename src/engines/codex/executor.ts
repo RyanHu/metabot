@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { BotConfigBase, CodexBotConfig } from '../../config.js';
 import type { Logger } from '../../utils/logger.js';
 import { AsyncQueue } from '../../utils/async-queue.js';
+import { resolveProvider } from '../providers.js';
 import type {
   ApiContext,
   ExecutionHandle,
@@ -161,6 +162,32 @@ export function buildCodexArgs(
   return args;
 }
 
+/**
+ * Translate a bot's `provider` config into env vars consumed by the Codex CLI.
+ * Codex speaks OpenAI's Chat Completions protocol, so we always set
+ * `OPENAI_BASE_URL` / `OPENAI_API_KEY`. When the provider's authStyle is
+ * `anthropic` (Claude family), `provider.baseUrl` must point at a translating
+ * proxy (e.g. LiteLLM) — Codex cannot speak Anthropic Messages API directly.
+ * Returns an empty object when no provider is configured, preserving the
+ * legacy behavior of inheriting OPENAI_* from process.env.
+ *
+ * Exported for unit testing.
+ */
+export function buildProviderEnv(config: BotConfigBase): Record<string, string> {
+  const resolved = resolveProvider(config.provider);
+  if (!resolved) return {};
+  const env: Record<string, string> = {
+    OPENAI_BASE_URL: resolved.baseUrl,
+  };
+  if (resolved.apiKey) {
+    env.OPENAI_API_KEY = resolved.apiKey;
+  }
+  for (const [k, v] of Object.entries(resolved.extraEnv)) {
+    env[k] = v;
+  }
+  return env;
+}
+
 export class CodexExecutor {
   constructor(
     private config: BotConfigBase,
@@ -226,7 +253,7 @@ export class CodexExecutor {
     try {
       child = spawn(codexConfig.executable || CODEX_EXECUTABLE, args, {
         cwd,
-        env: { ...process.env, ...(codexConfig.env ?? {}) },
+        env: { ...process.env, ...buildProviderEnv(this.config), ...(codexConfig.env ?? {}) },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (err: any) {
