@@ -343,6 +343,11 @@ export class MessageBridge {
     return this.quotaResume.list();
   }
 
+  /** Cancel a pending quota-resume by id. Returns false if not found / already fired. */
+  cancelQuotaResume(id: string): boolean {
+    return this.quotaResume.cancel(id);
+  }
+
   /**
    * Build a user-facing line that explains *when* the quota resume will fire.
    * Used to decorate the final error card so the user sees "I'll retry at HH:MM".

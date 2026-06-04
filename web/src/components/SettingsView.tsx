@@ -1,8 +1,31 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useStore } from '../store';
 import type { BotInfo } from '../types';
 import { BotManageDialog } from './BotManageDialog';
 import styles from './SettingsView.module.css';
+
+interface QuotaResumeEntry {
+  id: string;
+  botName: string;
+  chatId: string;
+  prompt: string;
+  unlockTime: number;
+  scheduledRetryAt: number;
+  errorSnippet?: string;
+  createdAt: number;
+  attempts: number;
+}
+
+function formatTime(t: number): string {
+  return new Date(t).toLocaleString('zh-CN', {
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+/** LiteLLM Admin UI base. Defaults to the studio host's port-61050 instance;
+ *  override at build time with VITE_LITELLM_URL for other deployments. */
+const LITELLM_URL =
+  (import.meta as any).env?.VITE_LITELLM_URL ?? 'http://192.168.50.14:61050/ui';
 
 export function SettingsView() {
   const theme = useStore((s) => s.theme);
@@ -18,6 +41,49 @@ export function SettingsView() {
 
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [editBot, setEditBot] = useState<BotInfo | undefined>();
+
+  const [quotaResumes, setQuotaResumes] = useState<QuotaResumeEntry[]>([]);
+  const [quotaLoading, setQuotaLoading] = useState(false);
+
+  const refreshQuotaResumes = useCallback(async () => {
+    if (!token) return;
+    setQuotaLoading(true);
+    try {
+      const r = await fetch('/api/quota-resumes', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setQuotaResumes(data.entries || []);
+      }
+    } catch {
+      // ignore — show empty
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    refreshQuotaResumes();
+    const id = setInterval(refreshQuotaResumes, 30_000);
+    return () => clearInterval(id);
+  }, [refreshQuotaResumes]);
+
+  const handleCancelQuotaResume = useCallback(
+    async (botName: string, entryId: string) => {
+      if (!window.confirm(`取消该 bot "${botName}" 的待续跑任务？取消后不会再自动重发。`)) return;
+      try {
+        await fetch(
+          `/api/quota-resumes/${encodeURIComponent(botName)}/${encodeURIComponent(entryId)}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+        );
+        await refreshQuotaResumes();
+      } catch {
+        // ignore
+      }
+    },
+    [token, refreshQuotaResumes],
+  );
 
   const handleCreateBot = useCallback(() => {
     setEditBot(undefined);
@@ -200,6 +266,83 @@ export function SettingsView() {
                       Delete
                     </button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* LLM Routing — LiteLLM Admin */}
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>LLM Routing</h2>
+        <div className={styles.card}>
+          <div className={styles.cardItem}>
+            <div className={styles.cardItemLeft}>
+              <span className={styles.cardItemLabel}>LiteLLM Admin Console</span>
+              <span className={styles.cardItemDesc}>
+                Model registry, virtual keys, usage dashboard &middot; {LITELLM_URL}
+              </span>
+            </div>
+            <a
+              className={`${styles.btn} ${styles.btnOutline}`}
+              href={LITELLM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open ↗
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Pending quota auto-resumes */}
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            Pending Quota Auto-Resumes ({quotaResumes.length})
+          </h2>
+          <button
+            className={`${styles.btn} ${styles.btnSmall} ${styles.btnOutline}`}
+            onClick={refreshQuotaResumes}
+            disabled={quotaLoading}
+          >
+            {quotaLoading ? '…' : 'Refresh'}
+          </button>
+        </div>
+        <div className={styles.card}>
+          {quotaResumes.length === 0 ? (
+            <div className={styles.cardItem}>
+              <div className={styles.cardItemLeft}>
+                <span className={styles.cardItemLabel}>No pending resumes</span>
+                <span className={styles.cardItemDesc}>
+                  Tasks that hit a usage limit will auto-retry at unlock_time + 2 min buffer and appear here.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.quotaList}>
+              {quotaResumes.map((e) => (
+                <div key={e.id} className={styles.quotaItem}>
+                  <div className={styles.quotaInfo}>
+                    <div className={styles.quotaTop}>
+                      <span className={styles.quotaBotTag}>{e.botName}</span>
+                      <span>{e.chatId}</span>
+                    </div>
+                    <div className={styles.quotaPrompt} title={e.prompt}>
+                      "{e.prompt}"
+                    </div>
+                    <div className={styles.quotaMeta}>
+                      unlock {formatTime(e.unlockTime)} &middot; fires {formatTime(e.scheduledRetryAt)}
+                      {e.attempts > 0 ? ` · attempts ${e.attempts}` : ''}
+                    </div>
+                  </div>
+                  <button
+                    className={`${styles.btn} ${styles.btnSmall} ${styles.btnDanger}`}
+                    onClick={() => handleCancelQuotaResume(e.botName, e.id)}
+                  >
+                    Cancel
+                  </button>
                 </div>
               ))}
             </div>
