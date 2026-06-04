@@ -35,6 +35,7 @@ import {
   handleExecutorRoutes,
   handleQuotaRoutes,
   handleVibeRoutes,
+  handleLlmSubscriptionsRoutes,
 } from './routes/index.js';
 import type { RouteContext } from './routes/index.js';
 import type { InstanceIdentity } from '../cluster/identity.js';
@@ -112,6 +113,7 @@ export function startApiServer(options: ApiServerOptions): http.Server {
     handleExecutorRoutes,
     handleQuotaRoutes,
     handleVibeRoutes,
+    handleLlmSubscriptionsRoutes,
   ];
 
   const server = http.createServer(async (req, res) => {

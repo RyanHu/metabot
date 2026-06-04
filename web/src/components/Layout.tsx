@@ -70,6 +70,15 @@ function IconVibe() {
     </svg>
   );
 }
+function IconLlm() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="14" rx="2" />
+      <path d="M8 20h8M12 18v2" />
+      <path d="M7 9l2 2-2 2M11 13h4" />
+    </svg>
+  );
+}
 function IconTeam() {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -416,6 +425,7 @@ function routeMatchesView(pathname: string, view: string): boolean {
   if (view === 'settings') return p.startsWith('/settings');
   if (view === 'team') return p.startsWith('/team');
   if (view === 'vibe') return p.startsWith('/vibe');
+  if (view === 'llm-subs') return p.startsWith('/llm-subs');
   return true;
 }
 
@@ -521,7 +531,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleMobileBack = useCallback(() => { setMobileShowChat(false); }, []);
 
-  const handleNav = useCallback((view: 'chat' | 'memory' | 'settings' | 'team' | 'vibe', path: string) => {
+  const handleNav = useCallback((view: 'chat' | 'memory' | 'settings' | 'team' | 'vibe' | 'llm-subs', path: string) => {
     setView(view);
     navigate(path);
     setMobileShowChat(false);
@@ -664,7 +674,7 @@ export function Layout({ children }: LayoutProps) {
             <div className={s.mobileListBrand}>
               <div className={s.logoMark}>M</div>
               <span className={s.mobileListTitle}>
-                {activeView === 'chat' ? 'Chats' : activeView === 'memory' ? 'Memory' : activeView === 'team' ? 'Team' : activeView === 'vibe' ? 'Vibe' : 'Settings'}
+                {activeView === 'chat' ? 'Chats' : activeView === 'memory' ? 'Memory' : activeView === 'team' ? 'Team' : activeView === 'vibe' ? 'Vibe' : activeView === 'llm-subs' ? 'LLM 订阅' : 'Settings'}
               </span>
             </div>
             {activeView === 'chat' && (
@@ -709,6 +719,13 @@ export function Layout({ children }: LayoutProps) {
             >
               <IconVibe />
               <span>Vibe</span>
+            </button>
+            <button
+              className={`${s.mobileTab} ${activeView === 'llm-subs' ? s.mobileTabActive : ''}`}
+              onClick={() => handleNav('llm-subs', '/llm-subs')}
+            >
+              <IconLlm />
+              <span>LLM</span>
             </button>
             <button
               className={`${s.mobileTab} ${activeView === 'memory' ? s.mobileTabActive : ''}`}
@@ -788,6 +805,13 @@ export function Layout({ children }: LayoutProps) {
           >
             <IconVibe />
             <span>Vibe</span>
+          </button>
+          <button
+            className={`${s.navBtn} ${activeView === 'llm-subs' ? s.navActive : ''}`}
+            onClick={() => handleNav('llm-subs', '/llm-subs')}
+          >
+            <IconLlm />
+            <span>LLM</span>
           </button>
           <button
             className={`${s.navBtn} ${activeView === 'memory' ? s.navActive : ''}`}
