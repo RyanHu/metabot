@@ -1,0 +1,194 @@
+.container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 44px 28px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.header { margin-bottom: 32px; }
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-0);
+  letter-spacing: -0.6px;
+  margin-bottom: 6px;
+}
+.subtitle { font-size: 14px; color: var(--text-1); }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+.toolbarLeft {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-family: var(--font-mono);
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: var(--r-md);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-1);
+  transition: all var(--duration-fast);
+}
+.btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-0);
+}
+
+.empty {
+  padding: 40px 22px;
+  text-align: center;
+  background: var(--surface-1);
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--r-lg);
+  color: var(--text-2);
+  font-size: 13px;
+}
+.empty code {
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-text);
+}
+
+.pipelineCard {
+  background: var(--surface-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 18px 22px;
+  margin-bottom: 14px;
+}
+.pipelineHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.slug {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.updatedAt {
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}
+.requirement {
+  font-size: 13px;
+  color: var(--text-1);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.phases {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.phaseDone { color: var(--green); background: var(--green-soft); }
+.phaseRunning { color: var(--accent-text); background: rgba(0, 214, 143, 0.08); }
+.phaseFailed { color: var(--red); background: var(--red-soft); }
+.phasePending { color: var(--text-2); }
+
+.artifacts {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--glass-border);
+}
+.artifactList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.artifactItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-1);
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.artifactItem:hover { background: var(--surface-hover); color: var(--text-0); }
+
+.prLink {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--accent-text);
+  text-decoration: none;
+  margin-top: 8px;
+  display: inline-block;
+}
+.prLink:hover { text-decoration: underline; }
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.modal {
+  background: var(--surface-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 820px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.modalHeader {
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modalTitle { font-family: var(--font-mono); font-size: 13px; color: var(--text-0); }
+.modalBody {
+  padding: 22px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-1);
+  line-height: 1.55;
+}

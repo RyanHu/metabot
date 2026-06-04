@@ -10,5 +10,6 @@ export { handleSkillHubRoutes } from './skill-hub-routes.js';
 export { handleManifestRoutes } from './manifest-routes.js';
 export { handleExecutorRoutes } from './executor-routes.js';
 export { handleQuotaRoutes } from './quota-routes.js';
+export { handleVibeRoutes } from './vibe-routes.js';
 export { jsonResponse, readBody, parseJsonBody } from './helpers.js';
 export type { RouteContext, RouteHandler } from './types.js';

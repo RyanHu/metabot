@@ -7,6 +7,7 @@ import { MemoryView } from './components/MemoryView';
 import { VoiceView } from './components/VoiceView';
 import { SettingsView } from './components/SettingsView';
 import { TeamWorkspace } from './components/team';
+import { VibeView } from './components/VibeView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 export function App() {
@@ -26,6 +27,7 @@ export function App() {
             <Route path="/voice" element={<VoiceView />} />
             <Route path="/settings" element={<SettingsView />} />
             <Route path="/team" element={<TeamWorkspace />} />
+            <Route path="/vibe" element={<VibeView />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
