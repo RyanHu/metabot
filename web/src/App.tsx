@@ -8,6 +8,7 @@ import { VoiceView } from './components/VoiceView';
 import { SettingsView } from './components/SettingsView';
 import { TeamWorkspace } from './components/team';
 import { VibeView } from './components/VibeView';
+import { LlmSubscriptionsView } from './components/LlmSubscriptionsView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
             <Route path="/settings" element={<SettingsView />} />
             <Route path="/team" element={<TeamWorkspace />} />
             <Route path="/vibe" element={<VibeView />} />
+            <Route path="/llm-subs" element={<LlmSubscriptionsView />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
