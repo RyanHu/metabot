@@ -9,6 +9,17 @@ interface BotManageDialogProps {
   onClose: () => void;
 }
 
+type ProviderName = '' | 'anthropic' | 'openai' | 'deepseek' | 'kimi' | 'qwen' | 'minimax' | 'custom';
+
+const PROVIDER_DEFAULTS: Record<Exclude<ProviderName, '' | 'custom'>, { baseUrl: string; hint: string }> = {
+  anthropic: { baseUrl: 'https://api.anthropic.com', hint: 'claude-opus-4-7' },
+  openai:    { baseUrl: 'https://api.openai.com/v1', hint: 'gpt-5.4-codex' },
+  deepseek:  { baseUrl: 'https://api.deepseek.com/v1', hint: 'deepseek-chat' },
+  kimi:      { baseUrl: 'https://api.moonshot.cn/v1', hint: 'kimi-latest' },
+  qwen:      { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', hint: 'qwen3-max' },
+  minimax:   { baseUrl: 'https://api.minimax.chat/v1', hint: 'MiniMax-M2' },
+};
+
 export function BotManageDialog({ mode, bot, onClose }: BotManageDialogProps) {
   const token = useStore((s) => s.token);
 
@@ -20,8 +31,18 @@ export function BotManageDialog({ mode, bot, onClose }: BotManageDialogProps) {
   const [model, setModel] = useState(bot?.model || '');
   const [maxTurns, setMaxTurns] = useState('');
   const [maxBudget, setMaxBudget] = useState('');
+  const [providerName, setProviderName] = useState<ProviderName>(bot?.providerName || '');
+  const [providerBaseUrl, setProviderBaseUrl] = useState('');
+  const [providerApiKey, setProviderApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleProviderChange = useCallback((next: ProviderName) => {
+    setProviderName(next);
+    if (next && next !== 'custom') {
+      setProviderBaseUrl((cur) => cur || PROVIDER_DEFAULTS[next].baseUrl);
+    }
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!name.trim() || !workDir.trim()) {
@@ -42,6 +63,19 @@ export function BotManageDialog({ mode, bot, onClose }: BotManageDialogProps) {
     if (engine === 'codex' && model.trim()) body.codex = { model: model.trim() };
     if (maxTurns.trim()) body.maxTurns = parseInt(maxTurns, 10);
     if (maxBudget.trim()) body.maxBudgetUsd = parseFloat(maxBudget);
+
+    if (providerName) {
+      // `custom` must supply baseUrl; presets only need it if the user overrides.
+      if (providerName === 'custom' && !providerBaseUrl.trim()) {
+        setError('Custom provider requires a Base URL');
+        setLoading(false);
+        return;
+      }
+      const provider: Record<string, unknown> = { name: providerName };
+      if (providerBaseUrl.trim()) provider.baseUrl = providerBaseUrl.trim();
+      if (providerApiKey.trim()) provider.apiKey = providerApiKey.trim();
+      body.provider = provider;
+    }
 
     try {
       const url = mode === 'create'
@@ -66,7 +100,7 @@ export function BotManageDialog({ mode, bot, onClose }: BotManageDialogProps) {
     } finally {
       setLoading(false);
     }
-  }, [name, platform, engine, workDir, description, model, maxTurns, maxBudget, mode, bot, token, onClose]);
+  }, [name, platform, engine, workDir, description, model, maxTurns, maxBudget, providerName, providerBaseUrl, providerApiKey, mode, bot, token, onClose]);
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -141,7 +175,7 @@ export function BotManageDialog({ mode, bot, onClose }: BotManageDialogProps) {
                 className={styles.input}
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder={engine === 'codex' ? 'gpt-5.4-codex' : engine === 'kimi' ? 'kimi-for-coding' : 'claude-opus-4-7'}
+                placeholder={providerName && providerName !== 'custom' ? PROVIDER_DEFAULTS[providerName].hint : (engine === 'codex' ? 'gpt-5.4-codex' : engine === 'kimi' ? 'kimi-for-coding' : 'claude-opus-4-7')}
               />
             </label>
             <label className={styles.field}>
@@ -166,6 +200,48 @@ export function BotManageDialog({ mode, bot, onClose }: BotManageDialogProps) {
               />
             </label>
           </div>
+
+          <label className={styles.field}>
+            <span className={styles.label}>Provider (optional — overrides engine default endpoint)</span>
+            <select
+              className={styles.input}
+              value={providerName}
+              onChange={(e) => handleProviderChange(e.target.value as ProviderName)}
+            >
+              <option value="">(use engine default)</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="kimi">Moonshot / Kimi</option>
+              <option value="qwen">Qwen (DashScope)</option>
+              <option value="minimax">MiniMax</option>
+              <option value="custom">Custom (LiteLLM / self-hosted)</option>
+            </select>
+          </label>
+
+          {providerName && (
+            <div className={styles.row}>
+              <label className={styles.field}>
+                <span className={styles.label}>Base URL{providerName === 'custom' ? ' *' : ''}</span>
+                <input
+                  className={styles.input}
+                  value={providerBaseUrl}
+                  onChange={(e) => setProviderBaseUrl(e.target.value)}
+                  placeholder={providerName === 'custom' ? 'http://192.168.50.14:61050' : PROVIDER_DEFAULTS[providerName].baseUrl}
+                />
+              </label>
+              <label className={styles.field}>
+                <span className={styles.label}>API Key (optional, falls back to env)</span>
+                <input
+                  className={styles.input}
+                  type="password"
+                  value={providerApiKey}
+                  onChange={(e) => setProviderApiKey(e.target.value)}
+                  placeholder="sk-..."
+                />
+              </label>
+            </div>
+          )}
         </div>
 
         {error && <div className={styles.error}>{error}</div>}

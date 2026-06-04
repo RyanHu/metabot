@@ -25,6 +25,8 @@ export interface BotInfo {
   model?: string;
   workingDirectory: string;
   ttsVoice?: string;
+  /** Optional LLM provider override. Surfaced for the management UI; never includes the key. */
+  providerName?: 'anthropic' | 'openai' | 'deepseek' | 'kimi' | 'qwen' | 'minimax' | 'custom';
   /** Set when the bot comes from a peer instance. */
   peerUrl?: string;
   /** Human-readable peer identifier. */
@@ -94,6 +96,7 @@ export class BotRegistry {
       ...(defaultModelForEngine(b.config) ? { model: defaultModelForEngine(b.config) } : {}),
       workingDirectory: b.config.claude.defaultWorkingDirectory,
       ...(b.config.ttsVoice ? { ttsVoice: b.config.ttsVoice } : {}),
+      ...(b.config.provider?.name ? { providerName: b.config.provider.name } : {}),
     }));
   }
 }
