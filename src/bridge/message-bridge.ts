@@ -17,6 +17,12 @@ import type {
 import { createEngine, resolveEngineName, StreamProcessor, SessionManager } from '../engines/index.js';
 import { ExecutorRegistry } from '../engines/claude/executor-registry.js';
 import { RateLimiter } from './rate-limiter.js';
+import {
+  QuotaResumeManager,
+  isUsageLimitError,
+  QUOTA_RESUME_BUFFER_MS,
+} from './quota-watcher.js';
+import type { QuotaResumeEntry } from './quota-watcher.js';
 import { OutputsManager } from './outputs-manager.js';
 import { MemoryClient } from '../memory/memory-client.js';
 import { AuditLogger } from '../utils/audit-logger.js';
@@ -258,6 +264,14 @@ export class MessageBridge {
   /** Callback for activity lifecycle events (task started/completed/failed). */
   onActivityEvent?: (event: ActivityEventData) => void;
 
+  /**
+   * Auto-resume manager for provider quota / rate-limit errors. Enrolls
+   * the prompt when an error like "you've reached your usage limit, try
+   * again at 14:30" comes back, fires it at unlock_time + 2 minutes
+   * (QUOTA_RESUME_BUFFER_MS — avoids clock-skew at the provider edge).
+   */
+  private quotaResume!: QuotaResumeManager;
+
   constructor(
     private config: BotConfigBase,
     private logger: Logger,
@@ -285,6 +299,59 @@ export class MessageBridge {
     );
 
     this.outputHandler = new OutputHandler(logger, sender, this.outputsManager);
+
+    this.quotaResume = new QuotaResumeManager(
+      config.name,
+      logger,
+      async (entry) => {
+        // Don't re-fire while another task is in flight for this chat; reschedule a few minutes out.
+        if (this.runningTasks.has(entry.chatId)) {
+          this.logger.info({ chatId: entry.chatId }, 'Quota resume: chat busy at fire time, re-enrolling for +5min');
+          this.quotaResume.enroll({
+            chatId: entry.chatId,
+            prompt: entry.prompt,
+            sendCards: entry.sendCards,
+            userId: entry.userId,
+            errorMessage: 'try again after 300 seconds',
+          });
+          return;
+        }
+        if (entry.sendCards) {
+          try {
+            await this.sender.sendTextNotice(
+              entry.chatId,
+              '⏰ 自动续跑',
+              `配额已解锁，正在重新执行你之前的请求…\n\n> ${entry.prompt.slice(0, 200)}${entry.prompt.length > 200 ? '…' : ''}`,
+              'blue',
+            );
+          } catch (err) {
+            this.logger.warn({ err, chatId: entry.chatId }, 'Quota resume: failed to send notice card');
+          }
+        }
+        await this.executeApiTask({
+          prompt: entry.prompt,
+          chatId: entry.chatId,
+          userId: entry.userId ?? 'quota-resume',
+          sendCards: entry.sendCards,
+        });
+      },
+    );
+  }
+
+  /** Pending quota-resume entries — surfaced by `/api/quota` for ops. */
+  listPendingQuotaResumes(): QuotaResumeEntry[] {
+    return this.quotaResume.list();
+  }
+
+  /**
+   * Build a user-facing line that explains *when* the quota resume will fire.
+   * Used to decorate the final error card so the user sees "I'll retry at HH:MM".
+   */
+  private quotaResumeFooter(entry: QuotaResumeEntry): string {
+    const fmt = (t: number) =>
+      new Date(t).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', month: '2-digit', day: '2-digit' });
+    const bufferMin = Math.round(QUOTA_RESUME_BUFFER_MS / 60_000);
+    return `\n\n⏰ 已检测用量超限。解锁时间 \`${fmt(entry.unlockTime)}\` + ${bufferMin} 分钟缓冲，将于 \`${fmt(entry.scheduledRetryAt)}\` 自动重新执行。`;
   }
 
   /** Emit an activity event if a listener is registered. */
@@ -2390,6 +2457,20 @@ export class MessageBridge {
         await rateLimiter.cancelAndWait();
       }
 
+      // Provider quota / rate-limit hit — enroll an auto-resume entry with
+      // a 2-minute buffer past the parsed unlock time so the next attempt
+      // doesn't race the provider's reset clock.
+      if (lastState.status === 'error' && isUsageLimitError(lastState.errorMessage) && userId !== 'quota-resume') {
+        const entry = this.quotaResume.enroll({
+          chatId, prompt, sendCards, userId,
+          errorMessage: lastState.errorMessage,
+        });
+        lastState = {
+          ...lastState,
+          errorMessage: (lastState.errorMessage || '') + this.quotaResumeFooter(entry),
+        };
+      }
+
       if (sendCards && messageId) {
         await this.sendFinalCard(messageId, lastState, chatId);
       }
@@ -2495,13 +2576,25 @@ export class MessageBridge {
         }
       }
 
+      // Provider quota / rate-limit caught as a thrown error — same auto-resume
+      // path as the post-stream branch above. 2-minute buffer applied inside
+      // quotaResume.enroll() via computeScheduledRetry.
+      let catchErrorMessage = err.message || 'Unknown error';
+      if (isUsageLimitError(catchErrorMessage) && userId !== 'quota-resume') {
+        const entry = this.quotaResume.enroll({
+          chatId, prompt, sendCards, userId,
+          errorMessage: catchErrorMessage,
+        });
+        catchErrorMessage = catchErrorMessage + this.quotaResumeFooter(entry);
+      }
+
       if (sendCards && messageId) {
         const errorState: CardState = {
           status: 'error',
           userPrompt: displayPrompt,
           responseText: lastState.responseText,
           toolCalls: lastState.toolCalls,
-          errorMessage: err.message || 'Unknown error',
+          errorMessage: catchErrorMessage,
         };
         await rateLimiter.cancelAndWait();
         await this.sendFinalCard(messageId, errorState, chatId);
@@ -2512,19 +2605,19 @@ export class MessageBridge {
         userPrompt: displayPrompt,
         responseText: lastState.responseText,
         toolCalls: lastState.toolCalls,
-        errorMessage: err.message || 'Unknown error',
+        errorMessage: catchErrorMessage,
       };
       options.onUpdate?.(catchErrorState, effectiveMessageId, true);
 
       this.emitActivity({
         type: 'task_failed', botName: this.config.name, chatId, userId, prompt: prompt?.slice(0, 200),
-        errorMessage: err.message || 'Unknown error', durationMs: Date.now() - startTime, timestamp: Date.now(),
+        errorMessage: catchErrorMessage, durationMs: Date.now() - startTime, timestamp: Date.now(),
       });
 
       return {
         success: false,
         responseText: lastState.responseText,
-        error: err.message || 'Unknown error',
+        error: catchErrorMessage,
       };
     } finally {
       clearTimeout(timeoutId);
@@ -2650,6 +2743,7 @@ export class MessageBridge {
       clearTimeout(batch.timerId);
     }
     this.pendingBatches.clear();
+    this.quotaResume?.destroy();
     for (const [chatId, task] of this.runningTasks) {
       if (task.questionTimeoutId) {
         clearTimeout(task.questionTimeoutId);
