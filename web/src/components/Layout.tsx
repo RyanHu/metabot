@@ -63,6 +63,13 @@ function IconSettings() {
     </svg>
   );
 }
+function IconVibe() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+    </svg>
+  );
+}
 function IconTeam() {
   return (
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -408,6 +415,7 @@ function routeMatchesView(pathname: string, view: string): boolean {
   if (view === 'memory') return p.startsWith('/memory');
   if (view === 'settings') return p.startsWith('/settings');
   if (view === 'team') return p.startsWith('/team');
+  if (view === 'vibe') return p.startsWith('/vibe');
   return true;
 }
 
@@ -513,7 +521,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleMobileBack = useCallback(() => { setMobileShowChat(false); }, []);
 
-  const handleNav = useCallback((view: 'chat' | 'memory' | 'settings' | 'team', path: string) => {
+  const handleNav = useCallback((view: 'chat' | 'memory' | 'settings' | 'team' | 'vibe', path: string) => {
     setView(view);
     navigate(path);
     setMobileShowChat(false);
@@ -656,7 +664,7 @@ export function Layout({ children }: LayoutProps) {
             <div className={s.mobileListBrand}>
               <div className={s.logoMark}>M</div>
               <span className={s.mobileListTitle}>
-                {activeView === 'chat' ? 'Chats' : activeView === 'memory' ? 'Memory' : activeView === 'team' ? 'Team' : 'Settings'}
+                {activeView === 'chat' ? 'Chats' : activeView === 'memory' ? 'Memory' : activeView === 'team' ? 'Team' : activeView === 'vibe' ? 'Vibe' : 'Settings'}
               </span>
             </div>
             {activeView === 'chat' && (
@@ -694,6 +702,13 @@ export function Layout({ children }: LayoutProps) {
             >
               <IconTeam />
               <span>Team</span>
+            </button>
+            <button
+              className={`${s.mobileTab} ${activeView === 'vibe' ? s.mobileTabActive : ''}`}
+              onClick={() => handleNav('vibe', '/vibe')}
+            >
+              <IconVibe />
+              <span>Vibe</span>
             </button>
             <button
               className={`${s.mobileTab} ${activeView === 'memory' ? s.mobileTabActive : ''}`}
@@ -766,6 +781,13 @@ export function Layout({ children }: LayoutProps) {
           >
             <IconTeam />
             <span>Team</span>
+          </button>
+          <button
+            className={`${s.navBtn} ${activeView === 'vibe' ? s.navActive : ''}`}
+            onClick={() => handleNav('vibe', '/vibe')}
+          >
+            <IconVibe />
+            <span>Vibe</span>
           </button>
           <button
             className={`${s.navBtn} ${activeView === 'memory' ? s.navActive : ''}`}

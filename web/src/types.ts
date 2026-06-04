@@ -214,5 +214,5 @@ export type WSOutgoingMessage =
   | { type: 'stop_asr' }
   | { type: 'ping' };
 
-export type ActiveView = 'chat' | 'memory' | 'voice' | 'settings' | 'team';
+export type ActiveView = 'chat' | 'memory' | 'voice' | 'settings' | 'team' | 'vibe';
 export type Theme = 'dark' | 'light';
