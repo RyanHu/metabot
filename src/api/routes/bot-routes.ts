@@ -35,6 +35,7 @@ export async function handleBotRoutes(
       model: defaultModelForConfig(bot.config),
       workingDirectory: bot.config.claude.defaultWorkingDirectory,
       maxConcurrentTasks: bot.config.maxConcurrentTasks, budgetLimitDaily: bot.config.budgetLimitDaily,
+      providerName: bot.config.provider?.name,
       stats: botStats || { totalTasks: 0, completedTasks: 0, failedTasks: 0, totalCostUsd: 0 },
     });
     return true;
@@ -87,6 +88,7 @@ export async function handleBotRoutes(
         ...(body.engine ? { engine: body.engine } : {}),
         ...(body.codex ? { codex: body.codex } : {}),
         ...(body.kimi ? { kimi: body.kimi } : {}),
+        ...(body.provider ? { provider: body.provider } : {}),
         feishuAppId: appId, feishuAppSecret: appSecret, defaultWorkingDirectory: workDir,
         ...(body.maxTurns ? { maxTurns: body.maxTurns } : {}),
         ...(body.maxBudgetUsd ? { maxBudgetUsd: body.maxBudgetUsd } : {}),
@@ -104,6 +106,7 @@ export async function handleBotRoutes(
         ...(body.engine ? { engine: body.engine } : {}),
         ...(body.codex ? { codex: body.codex } : {}),
         ...(body.kimi ? { kimi: body.kimi } : {}),
+        ...(body.provider ? { provider: body.provider } : {}),
         telegramBotToken: token, defaultWorkingDirectory: workDir,
         ...(body.maxTurns ? { maxTurns: body.maxTurns } : {}),
         ...(body.maxBudgetUsd ? { maxBudgetUsd: body.maxBudgetUsd } : {}),
@@ -120,6 +123,7 @@ export async function handleBotRoutes(
         ...(body.engine ? { engine: body.engine } : {}),
         ...(body.codex ? { codex: body.codex } : {}),
         ...(body.kimi ? { kimi: body.kimi } : {}),
+        ...(body.provider ? { provider: body.provider } : {}),
         defaultWorkingDirectory: workDir,
         ...(body.maxTurns ? { maxTurns: body.maxTurns } : {}),
         ...(body.maxBudgetUsd ? { maxBudgetUsd: body.maxBudgetUsd } : {}),

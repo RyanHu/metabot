@@ -383,6 +383,7 @@ MEMORY_INSTANCE_TOKEN=instance-scoped-token
 | `maxTurns` / `maxBudgetUsd` | 否 | 不限 | 执行限制 |
 | `model` | 否 | SDK 默认 | Claude 模型 |
 | `apiKey` | 否 | — | Anthropic API Key（不设则从 `~/.claude/.credentials.json` 动态读取，兼容 cc-switch） |
+| `provider` | 否 | — | 多模型路由（M3）：`{ name, baseUrl?, apiKey?, env? }` 指定底层 LLM 家族（anthropic / openai / deepseek / kimi / qwen / minimax / custom），可直连或经 LiteLLM 代理跨协议。详见 [docs/internal/provider.md](docs/internal/provider.md) |
 
 </details>
 

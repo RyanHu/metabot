@@ -11,6 +11,8 @@ Deep reference (don't paste back into context unless needed):
 - Feishu app setup: [docs/internal/feishu-setup.md](docs/internal/feishu-setup.md)
 - HTTPS / Caddy: [docs/internal/https-setup.md](docs/internal/https-setup.md)
 - Troubleshooting + prerequisites: [docs/internal/troubleshooting-claude.md](docs/internal/troubleshooting-claude.md)
+- LLM provider abstraction: [docs/internal/provider.md](docs/internal/provider.md)
+- Quota auto-resume (2-min buffer past unlock): [docs/internal/quota-resume.md](docs/internal/quota-resume.md)
 
 ## Working Mode: Orchestrate via the Resident Agent Team
 

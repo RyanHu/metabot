@@ -46,6 +46,53 @@
         "approvalPolicy": "never",
         "sandbox": "workspace-write"
       }
+    },
+    {
+      "name": "project-epsilon",
+      "description": "Claude Code routed through DeepSeek via LiteLLM proxy",
+      "engine": "claude",
+      "feishuAppId": "cli_epsilon",
+      "feishuAppSecret": "secret5",
+      "defaultWorkingDirectory": "/home/user/project-epsilon",
+      "provider": {
+        "name": "deepseek",
+        "baseUrl": "http://192.168.50.14:61050",
+        "apiKey": "sk-litellm-master-or-virtual-key"
+      },
+      "claude": {
+        "model": "deepseek-chat"
+      }
+    },
+    {
+      "name": "project-zeta",
+      "description": "Codex CLI routed at Anthropic Claude via LiteLLM proxy",
+      "engine": "codex",
+      "feishuAppId": "cli_zeta",
+      "feishuAppSecret": "secret6",
+      "defaultWorkingDirectory": "/home/user/project-zeta",
+      "provider": {
+        "name": "anthropic",
+        "baseUrl": "http://192.168.50.14:61050",
+        "apiKey": "sk-litellm-master-or-virtual-key"
+      },
+      "codex": {
+        "model": "claude-opus-4-7"
+      }
+    },
+    {
+      "name": "project-eta",
+      "description": "Direct DeepSeek (no proxy) — codex points straight at deepseek.com",
+      "engine": "codex",
+      "feishuAppId": "cli_eta",
+      "feishuAppSecret": "secret7",
+      "defaultWorkingDirectory": "/home/user/project-eta",
+      "provider": {
+        "name": "deepseek",
+        "apiKey": "sk-deepseek-real-key"
+      },
+      "codex": {
+        "model": "deepseek-chat"
+      }
     }
   ],
   "telegramBots": [

@@ -74,6 +74,8 @@ export interface BotInfo {
   engine?: 'claude' | 'kimi' | 'codex';
   model?: string;
   workingDirectory: string;
+  /** Optional provider override (anthropic/openai/deepseek/kimi/qwen/minimax/custom). */
+  providerName?: 'anthropic' | 'openai' | 'deepseek' | 'kimi' | 'qwen' | 'minimax' | 'custom';
 }
 
 export interface FileAttachment {
