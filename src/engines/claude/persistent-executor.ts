@@ -36,6 +36,7 @@ import type { Logger } from '../../utils/logger.js';
 import { AsyncQueue } from '../../utils/async-queue.js';
 import type { SDKMessage, TeamEvent, ApiContext } from './executor.js';
 import { apply1MContextSettings } from './executor.js';
+import type { ResolvedProvider } from '../providers.js';
 
 const isWindows = process.platform === 'win32';
 
@@ -69,41 +70,84 @@ function hasCredentialsFile(): boolean {
   }
 }
 
-function createSpawnFn(explicitApiKey?: string): (options: SpawnOptions) => SpawnedProcess {
-  // Mirror executor.ts: when env-based Anthropic auth is in use (proxy /
-  // gateway via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN), bypass the
-  // credentials.json filter so ANTHROPIC_AUTH_TOKEN reaches the subprocess.
+/**
+ * Pure helper extracted from {@link createSpawnFn} so the env-construction
+ * logic (Anthropic auth filtering + provider override injection) can be
+ * unit-tested without spawning a subprocess. Returns the env dict that
+ * would be handed to `spawn()`.
+ *
+ * Exported for tests. Production code should call {@link createSpawnFn}.
+ */
+export function buildSpawnEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  spawnOptionsEnv: Record<string, string | undefined> | undefined,
+  explicitApiKey: string | undefined,
+  provider: ResolvedProvider | undefined,
+  hasCredentials: boolean,
+): Record<string, string> {
+  // When env-based Anthropic auth is in use (proxy / gateway via
+  // ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN), bypass the credentials.json
+  // filter so ANTHROPIC_AUTH_TOKEN reaches the subprocess. A bot-level
+  // `provider` override counts as env-auth too — it routes the SDK at a
+  // non-default backend, so credentials.json (Opus subscription) must NOT
+  // take precedence.
   const preferEnvAuth =
-    process.env.METABOT_PREFER_ENV_AUTH === 'true' ||
-    !!(
-      process.env.ANTHROPIC_AUTH_TOKEN ||
-      process.env.ANTHROPIC_API_KEY ||
-      process.env.ANTHROPIC_BASE_URL
-    );
-  const filterAuthVars = !preferEnvAuth && !!(explicitApiKey || hasCredentialsFile());
+    baseEnv.METABOT_PREFER_ENV_AUTH === 'true' ||
+    !!provider ||
+    !!(baseEnv.ANTHROPIC_AUTH_TOKEN || baseEnv.ANTHROPIC_API_KEY || baseEnv.ANTHROPIC_BASE_URL);
+  const filterAuthVars = !preferEnvAuth && !!(explicitApiKey || hasCredentials);
+  const merged: Record<string, string | undefined> =
+    spawnOptionsEnv && Object.keys(spawnOptionsEnv).length > 0
+      ? { ...baseEnv, ...spawnOptionsEnv }
+      : { ...baseEnv };
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(merged)) {
+    if (value === undefined) continue;
+    if (CLAUDE_ENV_PASSTHROUGH.has(key)) { env[key] = value; continue; }
+    if (ALWAYS_FILTERED_PREFIXES.some(p => key.startsWith(p))) continue;
+    if (filterAuthVars && AUTH_ENV_VARS.some(v => key.startsWith(v))) continue;
+    env[key] = value;
+  }
+  if (explicitApiKey) env.ANTHROPIC_API_KEY = explicitApiKey;
+  // Provider override (M5.5-D fix): mirror executor.ts so persistent-executor
+  // bots that configure `provider` (e.g. 火山 Coding Plan via Anthropic-compat
+  // endpoint) actually reach the configured backend instead of falling
+  // through to credentials.json (Opus subscription).
+  if (provider) {
+    env.ANTHROPIC_BASE_URL = provider.baseUrl;
+    if (provider.apiKey) {
+      env.ANTHROPIC_API_KEY = provider.apiKey;
+      env.ANTHROPIC_AUTH_TOKEN = provider.apiKey;
+    }
+    for (const [k, v] of Object.entries(provider.extraEnv)) {
+      env[k] = v;
+    }
+  }
+  if (env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === undefined) {
+    env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1';
+  }
+  // Default-enable auto-memory so Claude can persist project patterns /
+  // preferences / decisions across sessions. Pin to '0' (= "don't disable")
+  // here so MetaBot stays on this default even if Claude Code flips its
+  // upstream default. Users can disable with CLAUDE_CODE_DISABLE_AUTO_MEMORY=1.
+  if (env.CLAUDE_CODE_DISABLE_AUTO_MEMORY === undefined) {
+    env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = '0';
+  }
+  return env;
+}
+
+function createSpawnFn(
+  explicitApiKey?: string,
+  provider?: ResolvedProvider,
+): (options: SpawnOptions) => SpawnedProcess {
   return (options: SpawnOptions): SpawnedProcess => {
-    const baseEnv = options.env && Object.keys(options.env).length > 0
-      ? { ...process.env, ...options.env }
-      : { ...process.env };
-    const env: Record<string, string> = {};
-    for (const [key, value] of Object.entries(baseEnv)) {
-      if (value === undefined) continue;
-      if (CLAUDE_ENV_PASSTHROUGH.has(key)) { env[key] = value; continue; }
-      if (ALWAYS_FILTERED_PREFIXES.some(p => key.startsWith(p))) continue;
-      if (filterAuthVars && AUTH_ENV_VARS.some(v => key.startsWith(v))) continue;
-      env[key] = value;
-    }
-    if (explicitApiKey) env.ANTHROPIC_API_KEY = explicitApiKey;
-    if (env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === undefined) {
-      env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1';
-    }
-    // Default-enable auto-memory so Claude can persist project patterns /
-    // preferences / decisions across sessions. Pin to '0' (= "don't disable")
-    // here so MetaBot stays on this default even if Claude Code flips its
-    // upstream default. Users can disable with CLAUDE_CODE_DISABLE_AUTO_MEMORY=1.
-    if (env.CLAUDE_CODE_DISABLE_AUTO_MEMORY === undefined) {
-      env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = '0';
-    }
+    const env = buildSpawnEnv(
+      process.env,
+      options.env,
+      explicitApiKey,
+      provider,
+      hasCredentialsFile(),
+    );
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       env,
@@ -126,6 +170,16 @@ export interface PersistentExecutorOptions {
   resumeSessionId?: string;
   /** Optional explicit API key, otherwise OAuth credentials file is used. */
   apiKey?: string;
+  /**
+   * Optional provider override. When set, the spawned Claude Code subprocess
+   * is pointed at this provider's `baseUrl` via `ANTHROPIC_BASE_URL`, with
+   * `apiKey` populating both `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`.
+   * Required for bots that route through a non-default Anthropic-compat
+   * backend (e.g. 火山引擎 Coding Plan, LiteLLM proxy). Without this, the
+   * subprocess would fall back to `~/.claude/.credentials.json` (Opus
+   * subscription) even when bots.json configures `provider`.
+   */
+  provider?: ResolvedProvider;
   model?: string;
   logger: Logger;
   /**
@@ -350,7 +404,7 @@ export class PersistentClaudeExecutor extends EventEmitter {
       cwd: this.options.cwd,
       includePartialMessages: true,
       settingSources: ['user', 'project'],
-      spawnClaudeCodeProcess: createSpawnFn(this.options.apiKey),
+      spawnClaudeCodeProcess: createSpawnFn(this.options.apiKey, this.options.provider),
       pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE,
       settings: { teammateMode: 'in-process' },
       agentProgressSummaries: true,

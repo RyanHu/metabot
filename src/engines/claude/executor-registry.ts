@@ -15,6 +15,7 @@
 import { EventEmitter } from 'node:events';
 import type { Logger } from '../../utils/logger.js';
 import type { TeamEvent, ApiContext } from './executor.js';
+import type { ResolvedProvider } from '../providers.js';
 import {
   PersistentClaudeExecutor,
   type PersistentExecutorOptions,
@@ -34,6 +35,13 @@ export interface RegistryOptions {
   defaultModel?: string;
   /** Default API key for new executors. */
   defaultApiKey?: string;
+  /**
+   * Default provider override for new executors. Used to point Claude
+   * Code's Anthropic client at a non-default backend (e.g. LiteLLM,
+   * volcengine Coding Plan). Injected into the spawned subprocess env
+   * via createSpawnFn() in persistent-executor.
+   */
+  defaultProvider?: ResolvedProvider;
 }
 
 /**
@@ -133,6 +141,7 @@ export class ExecutorRegistry extends EventEmitter {
       resumeSessionId: opts.resumeSessionId,
       apiKey: this.opts.defaultApiKey,
       model: opts.model ?? this.opts.defaultModel,
+      provider: this.opts.defaultProvider,
       logger: this.opts.logger,
       idleTimeoutMs: this.opts.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS,
       onTeamEvent: opts.onTeamEvent,
