@@ -16,6 +16,7 @@ import type {
 } from '../engines/index.js';
 import { createEngine, resolveEngineName, StreamProcessor, SessionManager } from '../engines/index.js';
 import { ExecutorRegistry } from '../engines/claude/executor-registry.js';
+import { resolveProvider } from '../engines/providers.js';
 import { RateLimiter } from './rate-limiter.js';
 import {
   QuotaResumeManager,
@@ -540,6 +541,7 @@ export class MessageBridge {
         maxConcurrent,
         defaultApiKey: this.config.claude.apiKey,
         defaultModel: this.config.claude.model,
+        defaultProvider: resolveProvider(this.config.provider),
       });
       // Stage 3 — every newly added executor gets a spontaneous-activity
       // subscription so teammate / goal / background pings between turns
