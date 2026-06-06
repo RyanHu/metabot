@@ -36,6 +36,7 @@ import {
   handleQuotaRoutes,
   handleVibeRoutes,
   handleLlmSubscriptionsRoutes,
+  handleVolcengineRelayRoutes,
 } from './routes/index.js';
 import type { RouteContext } from './routes/index.js';
 import type { InstanceIdentity } from '../cluster/identity.js';
@@ -114,14 +115,19 @@ export function startApiServer(options: ApiServerOptions): http.Server {
     handleQuotaRoutes,
     handleVibeRoutes,
     handleLlmSubscriptionsRoutes,
+    handleVolcengineRelayRoutes,
   ];
 
   const server = http.createServer(async (req, res) => {
     const method = req.method || 'GET';
     const url = req.url || '/';
 
-    // Auth check (exempt /web/, /memory/, /api/files/)
-    if (secret && !url.startsWith('/web') && !url.startsWith('/memory') && !url.startsWith('/api/files/') && url !== '/api/manifest') {
+    // Auth check (exempt /web/, /memory/, /api/files/, /api/relay/)
+    // /api/relay/* is the Anthropic-protocol passthrough for bots routed
+    // through a non-default backend (e.g. 火山引擎 Coding Plan); Claude CLI
+    // doesn't know our Bearer secret, so we cannot require it here. Each
+    // relay handler enforces its own loopback-only check instead.
+    if (secret && !url.startsWith('/web') && !url.startsWith('/memory') && !url.startsWith('/api/files/') && !url.startsWith('/api/relay/') && url !== '/api/manifest') {
       const auth = req.headers.authorization;
       const urlToken = url.includes('token=') ? new URL(url, `http://${req.headers.host || 'localhost'}`).searchParams.get('token') : null;
       if (auth !== `Bearer ${secret}` && urlToken !== secret) {
